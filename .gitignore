@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Node / UI
+web/node_modules/
+web/dist/
+
+# Local data & indexes
+storage/*
+!storage/.gitkeep
+data/books/*
+!data/books/.gitkeep
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+/tmp/
