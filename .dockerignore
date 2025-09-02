@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+web/node_modules
+web/dist
+.DS_Store
+server.log
+ingest_robbins.log
+

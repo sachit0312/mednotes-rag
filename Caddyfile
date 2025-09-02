@@ -1,0 +1,8 @@
+# Replace YOUR_DOMAIN with the domain you control
+YOUR_DOMAIN {
+  encode zstd gzip
+  reverse_proxy api:8000 {
+    header_up X-Forwarded-Proto {scheme}
+  }
+}
+
