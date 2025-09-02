@@ -287,7 +287,7 @@ export default function App() {
               <div className="stat">
                 {checkingOllama ? (<><span className="spinner"/> Checking…</>) : (<>
                   <span className={`dot ${ollamaInfo ? 'ok' : 'down'}`}></span>
-                  <span>{ollamaInfo?.current_model || '—'}</span>
+                  <span>{ollamaInfo ? 'Healthy' : 'Unreachable'}</span>
                 </>)}
               </div>
               {!ollamaInfo && ollamaError && <div className="error">{ollamaError}</div>}
