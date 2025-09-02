@@ -287,11 +287,10 @@ export default function App() {
               <div className="stat">
                 {checkingOllama ? (<><span className="spinner"/> Checking…</>) : (<>
                   <span className={`dot ${ollamaInfo ? 'ok' : 'down'}`}></span>
-                  <span>{ollamaInfo ? 'Healthy' : 'Unreachable'}</span>
+                  <span>{ollamaInfo?.current_model || '—'}</span>
                 </>)}
               </div>
               {!ollamaInfo && ollamaError && <div className="error">{ollamaError}</div>}
-              <div className="muted">Current model: {ollamaInfo?.current_model || '—'}</div>
               <select value={selectedModel} onChange={(e) => changeModel(e.target.value)} disabled={switchingModel || !models.length}>
                 <option value="">Select a model…</option>
                 {models.map(m => (
