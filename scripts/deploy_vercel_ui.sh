@@ -71,34 +71,31 @@ echo "Using API base URL: $API_URL"
 
 pushd web >/dev/null
   # Ensure project is linked
-  if [ -n "$VERCEL_SCOPE" ]; then
-    SCOPE_ARGS=("--scope" "$VERCEL_SCOPE")
-  else
-    SCOPE_ARGS=()
-  fi
+  SCOPE_FLAG=""
+  if [ -n "$VERCEL_SCOPE" ]; then SCOPE_FLAG="--scope $VERCEL_SCOPE"; fi
   if [ -n "$VERCEL_PROJECT" ]; then
-    $VERCEL_BIN link --yes --project "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
+    $VERCEL_BIN link --yes --project "$VERCEL_PROJECT" $SCOPE_FLAG >/dev/null 2>&1 || true
   else
-    $VERCEL_BIN link --yes "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
+    $VERCEL_BIN link --yes $SCOPE_FLAG >/dev/null 2>&1 || true
   fi
 
   # Set env var in Vercel for the target environment (adds a new value if one exists)
   # Best-effort: remove existing value to avoid interactive overwrite prompt
-  $VERCEL_BIN env rm VITE_API_BASE_URL "$ENVIRONMENT" --yes "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
-  printf "%s" "$API_URL" | $VERCEL_BIN env add VITE_API_BASE_URL "$ENVIRONMENT" "${SCOPE_ARGS[@]}"
+  $VERCEL_BIN env rm VITE_API_BASE_URL "$ENVIRONMENT" --yes $SCOPE_FLAG >/dev/null 2>&1 || true
+  printf "%s" "$API_URL" | $VERCEL_BIN env add VITE_API_BASE_URL "$ENVIRONMENT" $SCOPE_FLAG
 
   # Deploy
   if [ "$ENVIRONMENT" = "production" ]; then
     if [ -n "$VERCEL_PROJECT" ]; then
-      $VERCEL_BIN deploy --prod --yes --name "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}"
+      $VERCEL_BIN deploy --prod --yes --name "$VERCEL_PROJECT" $SCOPE_FLAG
     else
-      $VERCEL_BIN deploy --prod --yes "${SCOPE_ARGS[@]}"
+      $VERCEL_BIN deploy --prod --yes $SCOPE_FLAG
     fi
   else
     if [ -n "$VERCEL_PROJECT" ]; then
-      $VERCEL_BIN deploy --yes --name "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}"
+      $VERCEL_BIN deploy --yes --name "$VERCEL_PROJECT" $SCOPE_FLAG
     else
-      $VERCEL_BIN deploy --yes "${SCOPE_ARGS[@]}"
+      $VERCEL_BIN deploy --yes $SCOPE_FLAG
     fi
   fi
 popd >/dev/null
