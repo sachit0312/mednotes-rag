@@ -42,6 +42,10 @@ export default function App() {
   const [apiError, setApiError] = useState<string>('')
   const [ollamaError, setOllamaError] = useState<string>('')
   const [modelError, setModelError] = useState<string>('')
+  const [ngrokInfo, setNgrokInfo] = useState<{ running: boolean; url?: string; configured?: boolean; configured_url?: string; error?: string } | null>(null)
+  const [checkingNgrok, setCheckingNgrok] = useState(false)
+  const [restartingNgrok, setRestartingNgrok] = useState(false)
+  const [ngrokError, setNgrokError] = useState<string>('')
 
   function pushToast(text: string, type: 'success'|'error'|'info' = 'info', ttl = 2500) {
     const id = Date.now() + Math.floor(Math.random() * 1000)
@@ -59,9 +63,11 @@ export default function App() {
     // initial checks
     checkApi()
     checkOllama()
+    checkNgrok()
     const id = setInterval(() => {
       checkApi()
       checkOllama()
+      checkNgrok()
     }, 30000)
     return () => clearInterval(id)
   }, [])
@@ -206,6 +212,49 @@ export default function App() {
     }
   }
 
+  const checkNgrok = async () => {
+    try {
+      setCheckingNgrok(true)
+      const r = await fetch(url('/api/ngrok/status'))
+      const d = await r.json().catch(() => null)
+      if (d && typeof d === 'object') {
+        setNgrokInfo(d)
+        setNgrokError(d.running ? '' : (d.error ? `ngrok ${d.error}` : (d.configured ? 'ngrok configured but not running' : 'ngrok unreachable')))
+      } else {
+        setNgrokInfo(null)
+        setNgrokError('ngrok unreachable')
+      }
+    } catch {
+      setNgrokInfo(null)
+      setNgrokError('ngrok unreachable')
+    } finally {
+      setCheckingNgrok(false)
+    }
+  }
+
+  const restartNgrok = async () => {
+    try {
+      setRestartingNgrok(true)
+      setPending('Restarting ngrok...')
+      const headers: any = { }
+      if (adminKey) headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/admin/restart_ngrok'), { method: 'POST', headers })
+      if (!r.ok) {
+        const t = await r.text()
+        setAdminError(r.status === 403 ? 'Invalid admin key' : `Admin error: ${r.status}`)
+        throw new Error(t)
+      }
+      setAdminError('')
+      pushToast('ngrok restart triggered', 'success')
+    } catch (e) {
+      pushToast('Failed to restart ngrok', 'error')
+    } finally {
+      setTimeout(() => checkNgrok(), 1500)
+      setPending('')
+      setRestartingNgrok(false)
+    }
+  }
+
   const changeModel = async (m: string) => {
     try {
       setSwitchingModel(true)
@@ -345,6 +394,22 @@ export default function App() {
               <div className="sys-actions">
                 <button onClick={checkOllama} disabled={checkingOllama}>{checkingOllama ? (<><span className="spinner" /> Checking…</>) : 'Check'}</button>
                 <button onClick={restartOllama} className="secondary" disabled={restartingOllama}>{restartingOllama ? (<><span className="spinner" /> Restarting…</>) : 'Restart'}</button>
+              </div>
+            </div>
+          </div>
+          <div className="sys-card">
+            <div className="sys-title">ngrok</div>
+            <div className="sys-body">
+              <div className="stat">
+                {checkingNgrok ? (<><span className="spinner"/> Checking…</>) : (<>
+                  <span className={`dot ${ngrokInfo?.running ? 'ok' : 'down'}`}></span>
+                  <span>{ngrokInfo?.running ? 'Healthy' : 'Unreachable'}</span>
+                </>)}
+              </div>
+              {ngrokError && <div className="error">{ngrokError}</div>}
+              <div className="sys-actions">
+                <button onClick={checkNgrok} disabled={checkingNgrok}>{checkingNgrok ? (<><span className="spinner" /> Checking…</>) : 'Check'}</button>
+                <button onClick={restartNgrok} className="secondary" disabled={restartingNgrok}>{restartingNgrok ? (<><span className="spinner" /> Restarting…</>) : 'Restart'}</button>
               </div>
             </div>
           </div>

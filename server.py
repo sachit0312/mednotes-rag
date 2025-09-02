@@ -187,10 +187,7 @@ def admin_restart_api(request: Request):
 
 def _background_restart_ollama():
     try:
-        # Try to kill existing ollama serve and start a new one
-        subprocess.Popen(["pkill", "-f", "ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(1)
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(["bash", "scripts/restart_ollama.sh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
@@ -208,6 +205,43 @@ def require_admin(request: Request):
 def admin_restart_ollama(request: Request):
     require_admin(request)
     threading.Thread(target=_background_restart_ollama, daemon=True).start()
+    return {"status": "restarting"}
+
+
+@app.get("/api/ngrok/status")
+def ngrok_status():
+    api = os.getenv("NGROK_API_URL", "http://127.0.0.1:4040/api/tunnels")
+    configured_domain = os.getenv("NGROK_DOMAIN")
+    configured_url = None
+    if configured_domain:
+        configured_url = configured_domain if configured_domain.startswith("http") else f"https://{configured_domain}"
+    out = {"running": False, "url": None, "configured": bool(configured_domain), "configured_url": configured_url, "error": None}
+    try:
+        r = requests.get(api, timeout=3)
+        r.raise_for_status()
+        data = r.json()
+        tunnels = data.get("tunnels", [])
+        https = next((t.get("public_url") for t in tunnels if t.get("proto") == "https"), None)
+        if https:
+            out.update({"running": True, "url": https})
+        return out
+    except Exception as e:
+        out["error"] = f"unreachable: {e}"
+        # Return 200 with running False so UI can show configured domain gracefully
+        return out
+
+
+def _background_restart_ngrok():
+    try:
+        subprocess.Popen(["bash", "scripts/restart_ngrok.sh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+@app.post("/api/admin/restart_ngrok")
+def admin_restart_ngrok(request: Request):
+    require_admin(request)
+    threading.Thread(target=_background_restart_ngrok, daemon=True).start()
     return {"status": "restarting"}
 
 # Mount static UI after ALL API routes to avoid intercepting /api/*

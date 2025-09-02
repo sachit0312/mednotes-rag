@@ -28,7 +28,8 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .badge { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid #2a3b62; background: #0a1326; color: var(--fg); }
 .badge.ok { border-color: #1e7041; background: #0c1b12; }
 .badge.down { border-color: #7a2222; background: #1a0e0e; }
-.system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+.system-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; }
+@media (max-width: 820px) { .system-grid { grid-template-columns: 1fr; } }
 .sys-card { background: #0d1528; border: 1px solid #213356; border-radius: 10px; padding: 12px; }
 .sys-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .sys-body { display: flex; flex-direction: column; gap: 8px; }
