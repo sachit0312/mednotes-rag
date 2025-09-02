@@ -34,6 +34,7 @@
 ## Security & Configuration Tips
 - Set `ADMIN_KEY` to enable admin endpoints; never commit secrets or PDFs. Generated data lives in `storage/`.
 - Changing `EMBED_MODEL_NAME` requires re‑ingest; reranker/LLM swaps do not. `OLLAMA_MODEL` can be overridden via env.
+- Configuration rule: never hardcode endpoints/keys in code. Put runtime knobs in `config.py` and deploy/runtime hosts in `deploy.env` (e.g., `NGROK_DOMAIN`, optional `API_BASE_URL`). UI/server should read from env; Python knobs live in `config.py`.
 
 ## Deploy (Vercel + ngrok)
 - Configure once in `deploy.env` (e.g., `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app`).
