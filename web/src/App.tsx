@@ -52,9 +52,6 @@ export default function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || ''
 
   React.useEffect(() => {
-    const k = localStorage.getItem('adminKey') || 'sachit loves astha'
-    setAdminKey(k)
-    if (!localStorage.getItem('adminKey')) localStorage.setItem('adminKey', k)
     // initial checks
     checkApi()
     checkOllama()
@@ -295,7 +292,7 @@ export default function App() {
                 ))}
               </select>
               <label style={{ marginTop: 10 }}>Admin key (required to change model)</label>
-              <input type="password" value={adminKey} onChange={(e) => { setAdminKey(e.target.value); localStorage.setItem('adminKey', e.target.value) }} placeholder="Enter admin key" />
+              <input type="password" value={adminKey} onChange={(e) => { setAdminKey(e.target.value) }} placeholder="Enter admin key" />
               {adminError && <div className="error" style={{ marginTop: 6 }}>{adminError}</div>}
             </div>
           </div>
