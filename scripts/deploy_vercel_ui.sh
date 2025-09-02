@@ -21,6 +21,9 @@ if [ -f "$(dirname "$0")/../deploy.env" ]; then
 fi
 
 ENVIRONMENT="${1:-production}"
+VERCEL_BIN=${VERCEL_BIN:-vercel}
+VERCEL_PROJECT=${VERCEL_PROJECT:-}
+VERCEL_SCOPE=${VERCEL_SCOPE:-}
 API_BASE_URL="${API_BASE_URL:-}"
 NGROK_DOMAIN="${NGROK_DOMAIN:-}"
 NGROK_API_URL="${NGROK_API_URL:-http://127.0.0.1:4040/api/tunnels}"
@@ -68,18 +71,35 @@ echo "Using API base URL: $API_URL"
 
 pushd web >/dev/null
   # Ensure project is linked
-  vercel link --yes >/dev/null 2>&1 || true
+  if [ -n "$VERCEL_SCOPE" ]; then
+    SCOPE_ARGS=("--scope" "$VERCEL_SCOPE")
+  else
+    SCOPE_ARGS=()
+  fi
+  if [ -n "$VERCEL_PROJECT" ]; then
+    $VERCEL_BIN link --yes --project "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
+  else
+    $VERCEL_BIN link --yes "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
+  fi
 
   # Set env var in Vercel for the target environment (adds a new value if one exists)
   # Best-effort: remove existing value to avoid interactive overwrite prompt
-  vercel env rm VITE_API_BASE_URL "$ENVIRONMENT" --yes >/dev/null 2>&1 || true
-  printf "%s" "$API_URL" | vercel env add VITE_API_BASE_URL "$ENVIRONMENT"
+  $VERCEL_BIN env rm VITE_API_BASE_URL "$ENVIRONMENT" --yes "${SCOPE_ARGS[@]}" >/dev/null 2>&1 || true
+  printf "%s" "$API_URL" | $VERCEL_BIN env add VITE_API_BASE_URL "$ENVIRONMENT" "${SCOPE_ARGS[@]}"
 
   # Deploy
   if [ "$ENVIRONMENT" = "production" ]; then
-    vercel deploy --prod --yes
+    if [ -n "$VERCEL_PROJECT" ]; then
+      $VERCEL_BIN deploy --prod --yes --name "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}"
+    else
+      $VERCEL_BIN deploy --prod --yes "${SCOPE_ARGS[@]}"
+    fi
   else
-    vercel deploy --yes
+    if [ -n "$VERCEL_PROJECT" ]; then
+      $VERCEL_BIN deploy --yes --name "$VERCEL_PROJECT" "${SCOPE_ARGS[@]}"
+    else
+      $VERCEL_BIN deploy --yes "${SCOPE_ARGS[@]}"
+    fi
   fi
 popd >/dev/null
 
