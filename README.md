@@ -33,6 +33,9 @@ Quick Start (Dev)
 - API: `.venv/bin/uvicorn server:app --reload --port 8000`
 - UI: `cd web && npm install && npm run dev` → open http://localhost:5173
 
+Restart backend quickly:
+- `bash scripts/restart_backend.sh` (kills anything on port 8000, starts Uvicorn, waits for health)
+
 Production-style UI
 -------------------
 - `cd web && npm run build` then open http://localhost:8000 (served from `web/dist`).
@@ -103,9 +106,9 @@ Edit `Caddyfile` and replace `YOUR_DOMAIN` with your domain. Then enable the pro
 Environment knobs
 -----------------
 
-Split Deploy (Vercel UI + Local ngrok API)
+Split Deploy (Vercel UI + Local/Remote API)
 ------------------------------------------
-Keep API + Ollama on your laptop; deploy only the UI.
+Keep API + Ollama on your laptop (ngrok or tunnel), or host API remotely; deploy only the UI.
 
 1) Run locally:
 - `ollama serve & && ollama pull qwen2.5:7b-instruct`
@@ -114,15 +117,16 @@ Keep API + Ollama on your laptop; deploy only the UI.
 
 2) Expose via ngrok:
 - `brew install ngrok && ngrok config add-authtoken <TOKEN>`
-- `ngrok http 8000` → copy the HTTPS forwarding URL.
+- Option A (reserved domain): `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app bash scripts/start_ngrok.sh --daemon` → API base: `https://flea-whole-loosely.ngrok-free.app`
+- Option B (ephemeral): `ngrok http 8000` → copy the HTTPS forwarding URL from http://127.0.0.1:4040
 
 3) Deploy UI to Vercel:
-- Project root: `web`, build: `npm run build`, output: `web/dist`.
-- Set env var `VITE_API_BASE_URL` to your ngrok URL.
-- Deploy. The UI will call `${VITE_API_BASE_URL}/api/*`.
+- One-liner (reserved domain): `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app ./scripts/deploy_vercel_ui.sh production`
+- One-liner (explicit URL): `API_BASE_URL=https://<your-api-host> ./scripts/deploy_vercel_ui.sh production`
+- The UI reads `${VITE_API_BASE_URL}` at build time and calls `${VITE_API_BASE_URL}/api/*`.
 
-Helper script (optional):
-- `./scripts/update_vercel_api_base.sh production` will read the current ngrok URL from `http://127.0.0.1:4040/api/tunnels`, update Vercel env `VITE_API_BASE_URL`, and deploy.
-  - Prereqs: Vercel CLI logged in and linked in `web/`, ngrok running.
+Helper scripts:
+- `./scripts/deploy_vercel_ui.sh [production|preview]` sets `VITE_API_BASE_URL` (from `API_BASE_URL` or `NGROK_DOMAIN` or local ngrok API) and deploys.
+- `./scripts/update_vercel_api_base.sh production` supports `NGROG_DOMAIN=<your-domain>` and falls back to the local ngrok API.
 - `OLLAMA_BASE_URL` (set in compose): where API reaches Ollama. Defaults to `http://localhost:11434` for local dev; in Docker it points to `http://ollama:11434`.
 - All other knobs live in `config.py`.
