@@ -5,11 +5,13 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font-fa
 h1 { margin: 0 0 8px; font-size: 28px; }
 p { margin: 0 0 24px; color: var(--muted); }
 .card { background: var(--card); border: 1px solid #1f2b4a; border-radius: 10px; padding: 18px; overflow: hidden; }
-.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
 .row > * { flex: 1 1 280px; min-width: 0; }
 label { font-size: 12px; color: var(--muted); display:block; margin: 10px 0 6px; }
 input[type="text"], textarea, select { width: 100%; background: #0f172a; color: var(--fg); border: 1px solid #223252; border-radius: 8px; padding: 10px 12px; font-size: 15px; box-sizing: border-box; }
-textarea { height: 120px; resize: vertical; }
+/* Slightly larger field for the main question/topic */
+.question-input { padding: 16px 18px; font-size: 16px; height: 56px; }
+textarea { height: 84px; resize: vertical; }
 button { background: var(--accent); color: #041116; border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 600; cursor: pointer; }
 button:disabled { opacity: .6; cursor: not-allowed; }
 .answer { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #0a1020; border: 1px solid #223252; border-radius: 10px; padding: 14px; min-height: 160px; overflow-wrap: anywhere; }

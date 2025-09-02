@@ -209,16 +209,14 @@ export default function App() {
               </select>
             </div>
           )}
-          <div>
-            <label>Topic / Question</label>
-            <input
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="e.g., 'What determines mean arterial pressure?' or 'Renal autoregulation'"
-            />
-          </div>
         </div>
+
+        <label>Topic / Question</label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="e.g., 'What determines mean arterial pressure?' or 'Renal autoregulation'"
+        />
 
         <label>Advanced context (optional)</label>
         <textarea
