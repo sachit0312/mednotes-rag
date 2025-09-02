@@ -23,8 +23,9 @@ MMR_LAMBDA = 0.7       # 0..1, higher = more relevance, lower = more diversity
 EMBED_MODEL_NAME = "BAAI/bge-m3"
 RERANK_MODEL_NAME = "BAAI/bge-reranker-v2-m3"
 # LLM served by Ollama
-# Recommended local default: Qwen2.5 7B Instruct (pull via `ollama pull qwen2.5:7b-instruct`)
-OLLAMA_MODEL = "qwen2.5:7b-instruct"
+# Upgraded local default: Qwen2.5 14B Instruct (q4 quantization)
+# Pull via: `ollama pull qwen2.5:14b-instruct-q4_K_M`
+OLLAMA_MODEL = "qwen2.5:14b-instruct-q4_K_M"
 
 # generation
 MAX_TOKENS = 700

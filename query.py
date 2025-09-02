@@ -218,8 +218,9 @@ def pack_context(rows: List[Dict]) -> str:
 
 def call_ollama(system: str, user: str) -> str:
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
     body = {
-        "model": OLLAMA_MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -234,8 +235,9 @@ def call_ollama(system: str, user: str) -> str:
 
 def call_ollama_stream(system: str, user: str) -> Iterable[str]:
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
     body = {
-        "model": OLLAMA_MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -292,13 +294,13 @@ def answer_note(topic: str, template: str = "general", books: Optional[List[str]
 
     t = (template or "general").lower()
     if t == "disease":
-        tmpl = DISEASE_1PAGER
+        tmpl = DISEASE
     elif t == "drug":
-        tmpl = DRUG_CARD
-    elif t in ("procedure", "algorithm", "algo"):
+        tmpl = DRUG
+    elif t in ("procedure"):
         tmpl = PROCEDURE
     else:
-        tmpl = NOTE_CARD
+        tmpl = GENERAL
 
     prompt = tmpl.format(topic=topic, context=context)
     ans = call_ollama(SYSTEM_BASE, prompt)

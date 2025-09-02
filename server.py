@@ -4,14 +4,16 @@ import subprocess
 import threading
 import time
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import lancedb
 from query import answer_qa, answer_note, answer_qa_stream, answer_note_stream
-from config import LANCE_DIR, OLLAMA_MODEL
+from config import LANCE_DIR, OLLAMA_MODEL, DATA_DIR
+from typing import Dict, Any
+from datetime import datetime
 
 app = FastAPI(title="MedNotes RAG API", version="0.1.0")
 
@@ -32,6 +34,9 @@ _dist = Path("web/dist")
 WEB_DIR = _dist if _dist.exists() else Path("web")
 WEB_DIR.mkdir(exist_ok=True)
 
+# In-memory ingest jobs registry
+INGEST_JOBS: Dict[str, Dict[str, Any]] = {}
+
 
 @app.get("/api/health")
 def health():
@@ -40,17 +45,91 @@ def health():
 
 @app.get("/api/books")
 def list_books():
+    # List books solely from data/books/*.pdf
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        pdfs = sorted([p.stem for p in DATA_DIR.glob("*.pdf")])
+        return {"books": pdfs}
+    except Exception:
+        return {"books": []}
+
+
+# (Removed books_detail; keep a single source of truth via data/books)
+
+
+def _book_exists(book_id: str) -> bool:
     try:
         db = lancedb.connect(str(LANCE_DIR))
         tbl = db.open_table("chunks")
+        import pandas as pd  # type: ignore
+        df = tbl.to_pandas(columns=["book_id"])  # reduce payload
+        return any(df["book_id"] == book_id)
     except Exception:
-        return {"books": []}
+        return False
+
+
+def _update_job(book_id: str, **fields):
+    job = INGEST_JOBS.get(book_id) or {"book_id": book_id}
+    job.update(fields)
+    job["updated_at"] = datetime.utcnow().isoformat()
+    INGEST_JOBS[book_id] = job
+
+
+def _run_ingest_job(book_id: str, pdf_path: Path):
+    from ingest import extract_pages, chunk_pages, build_dense_index, build_bm25
     try:
-        df = tbl.to_pandas()
-        books = sorted([b for b in df["book_id"].dropna().unique().tolist() if b])
-        return {"books": books}
-    except Exception:
-        return {"books": []}
+        _update_job(book_id, status="ingesting", percent=10, message="saved_pdf", started_at=datetime.utcnow().isoformat())
+        pages = list(extract_pages(pdf_path))
+        _update_job(book_id, status="ingesting", percent=25, message="extracted_pages", pages=len(pages))
+        rows = list(chunk_pages(pages, book_id))
+        _update_job(book_id, status="ingesting", percent=45, message="chunked", chunks=len(rows))
+
+        rows_for_dense = [dict(r) for r in rows]
+        rows_for_bm25 = [dict(r) for r in rows]
+        def cb_dense(frac: float):
+            pct = 45 + int(30 * max(0.0, min(1.0, frac)))
+            _update_job(book_id, status="ingesting", percent=pct, message="embedding")
+        build_dense_index(rows_for_dense, progress_cb=cb_dense)
+        _update_job(book_id, status="ingesting", percent=75, message="dense_index_built")
+        def cb_bm25(frac: float):
+            pct = 75 + int(20 * max(0.0, min(1.0, frac)))
+            _update_job(book_id, status="ingesting", percent=pct, message="bm25")
+        build_bm25(rows_for_bm25, progress_cb=cb_bm25)
+        _update_job(book_id, status="complete", percent=100, message="done")
+    except Exception as e:
+        _update_job(book_id, status="error", percent=100, error=str(e))
+
+
+@app.post("/api/ingest")
+def api_ingest(request: Request, pdf: UploadFile = File(...), book_id: str = Form(...)):
+    require_admin(request)
+    if not book_id or not isinstance(book_id, str):
+        raise HTTPException(status_code=400, detail="Missing 'book_id'")
+    if _book_exists(book_id) or book_id in INGEST_JOBS:
+        raise HTTPException(status_code=409, detail="book_id already exists or is being ingested")
+    # Save uploaded file
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    dest = DATA_DIR / f"{book_id}.pdf"
+    try:
+        with dest.open("wb") as f:
+            f.write(pdf.file.read())
+    finally:
+        try:
+            pdf.file.close()
+        except Exception:
+            pass
+    _update_job(book_id, status="queued", percent=5, message="uploaded", filename=str(dest))
+    threading.Thread(target=_run_ingest_job, args=(book_id, dest), daemon=True).start()
+    return {"status": "queued", "book_id": book_id}
+
+
+@app.get("/api/ingest/jobs")
+def api_ingest_jobs():
+    # Only show active or failed jobs; hide completed to avoid clutter
+    jobs = [j for j in INGEST_JOBS.values() if j.get("status") != "complete"]
+    # most recent first
+    jobs.sort(key=lambda j: j.get("updated_at", ""), reverse=True)
+    return {"jobs": jobs}
 
 
 @app.post("/api/qa")
@@ -206,6 +285,12 @@ def admin_restart_ollama(request: Request):
     require_admin(request)
     threading.Thread(target=_background_restart_ollama, daemon=True).start()
     return {"status": "restarting"}
+
+
+@app.get("/api/admin/validate")
+def admin_validate(request: Request):
+    require_admin(request)
+    return {"status": "ok"}
 
 
 @app.get("/api/ngrok/status")

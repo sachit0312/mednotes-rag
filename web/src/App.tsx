@@ -41,6 +41,13 @@ export default function App() {
   const [apiError, setApiError] = useState<string>('')
   const [ollamaError, setOllamaError] = useState<string>('')
   const [modelError, setModelError] = useState<string>('')
+  const [books, setBooks] = useState<string[]>([])
+  const [jobs, setJobs] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadBookId, setUploadBookId] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminValidating, setAdminValidating] = useState(false)
 
   function pushToast(text: string, type: 'success'|'error'|'info' = 'info', ttl = 2500) {
     const id = Date.now() + Math.floor(Math.random() * 1000)
@@ -55,11 +62,18 @@ export default function App() {
     // initial checks
     checkApi()
     checkOllama()
-    const id = setInterval(() => {
-      checkApi()
-      checkOllama()
+    fetchBooks()
+    fetchJobs()
+    const healthId = setInterval(() => {
+      checkApi(); checkOllama()
     }, 30000)
-    return () => clearInterval(id)
+    const booksId = setInterval(() => {
+      fetchBooks()
+    }, 30000)
+    const jobsId = setInterval(() => {
+      fetchJobs()
+    }, 30000)
+    return () => { clearInterval(healthId); clearInterval(booksId); clearInterval(jobsId) }
   }, [])
 
   async function callStream(endpoint: string, payload: Record<string, unknown>, onChunk: (s: string) => void) {
@@ -181,12 +195,131 @@ export default function App() {
     }
   }
 
+  const fetchBooks = async () => {
+    try {
+      const r = await fetch(url('/api/books'), { headers: NGROK_HEADERS })
+      if (r.ok) {
+        const d = await r.json()
+        setBooks(d.books || [])
+      }
+    } catch {}
+  }
+
+  const fetchJobs = async () => {
+    try {
+      const r = await fetch(url('/api/ingest/jobs'), { headers: NGROK_HEADERS })
+      if (r.ok) {
+        const d = await r.json()
+        setJobs(d.jobs || [])
+      }
+    } catch {}
+  }
+
+  const doUpload = async () => {
+    if (!isAdmin) {
+      pushToast('Enter a valid admin key first', 'error')
+      return
+    }
+    if (!uploadFile || !uploadBookId.trim()) {
+      pushToast('Select a PDF and enter a Book ID', 'error')
+      return
+    }
+    try {
+      setUploading(true)
+      const fd = new FormData()
+      fd.append('pdf', uploadFile)
+      fd.append('book_id', uploadBookId.trim())
+      const headers: any = {}
+      if (adminKey) headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/ingest'), { method: 'POST', body: fd, headers })
+      if (!r.ok) {
+        const t = await r.text()
+        setAdminError(r.status === 403 ? 'Invalid admin key' : `Upload failed (${r.status})`)
+        throw new Error(t)
+      }
+      setAdminError('')
+      pushToast('Upload queued', 'success')
+      setUploadFile(null); setUploadBookId('')
+      await fetchJobs(); await fetchBooks()
+    } catch (e) {
+      pushToast('Failed to upload', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const validateAdmin = async () => {
+    if (!adminKey) { setIsAdmin(false); setAdminError(''); return }
+    try {
+      setAdminValidating(true)
+      const headers: any = { ...NGROK_HEADERS }
+      headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/admin/validate'), { headers })
+      if (!r.ok) throw new Error(await r.text())
+      setIsAdmin(true)
+      setAdminError('')
+      pushToast('Admin mode enabled', 'success')
+    } catch (e) {
+      setIsAdmin(false)
+      setAdminError('Invalid admin key')
+    } finally {
+      setAdminValidating(false)
+    }
+  }
+
   return (
     <div className="wrap">
       <h1>MedNotes RAG</h1>
       <p>Ask questions or generate a concise study note card from your ingested textbook.</p>
 
-      <div className="card">
+      <div className="app-grid">
+        <aside>
+          <div className="card" style={{ marginTop: 0 }}>
+            <h3 style={{marginTop:0, fontSize:16}}>Admin</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="password" value={adminKey} onChange={(e) => { setAdminKey(e.target.value); if (!e.target.value) setIsAdmin(false) }} placeholder="Enter admin key" />
+              <button className="secondary" onClick={validateAdmin} disabled={adminValidating || !adminKey}>{adminValidating ? 'Checking…' : (isAdmin ? 'Enabled' : 'Enable')}</button>
+            </div>
+            {adminError && <div className="error" style={{ marginTop: 6 }}>{adminError}</div>}
+          </div>
+          <div className="card" style={{ marginTop: 12 }}>
+            <h3 style={{marginTop:0, fontSize:16}}>Books</h3>
+            <div className="muted" style={{marginBottom:6}}>{books.length} book(s)</div>
+            <div className="answer" style={{minHeight:0}}>
+              {books.length ? books.map((b,i)=>(<div key={i} style={{marginBottom:6}}>{b}</div>)) : 'No books yet.'}
+            </div>
+          </div>
+          {isAdmin && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <h3 style={{marginTop:0, fontSize:16}}>Upload Book</h3>
+            <label>PDF</label>
+            <input type="file" accept="application/pdf" onChange={(e)=> setUploadFile(e.target.files?.[0] || null)} />
+            <label>Book ID</label>
+            <input type="text" value={uploadBookId} onChange={(e)=> setUploadBookId(e.target.value)} placeholder="e.g., Harrison-20e" />
+            <div style={{marginTop:10}}>
+              <button onClick={doUpload} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</button>
+            </div>
+          </div>
+          )}
+          <div className="card" style={{ marginTop: 12 }}>
+            <h3 style={{marginTop:0, fontSize:16}}>Ingestion</h3>
+            <div className="answer" style={{minHeight:0}}>
+              {jobs.length ? jobs.filter(j=>j.status!== 'complete').map((j,i)=> (
+                <div key={i} style={{marginBottom:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <div>{j.book_id}</div>
+                    <div className="muted" style={{fontSize:11}}>{j.status} · {Math.min(100, Math.max(0, Number(j.percent||0)))}%</div>
+                  </div>
+                  <div style={{height:6, background:'#0f172a', border:'1px solid #223252', borderRadius:6, overflow:'hidden'}}>
+                    <div style={{height:'100%', width:`${Math.min(100, Math.max(0, Number(j.percent||0)))}%`, background:'#4cc9f0'}} />
+                  </div>
+                </div>
+              )) : 'No active jobs.'}
+            </div>
+          </div>
+        </aside>
+        <main>
+          <div className="card">
         <div className="row">
           <div>
             <label>Mode</label>
@@ -256,11 +389,11 @@ export default function App() {
         )}
       </div>
 
-      <div className="footer">
-        Ensure Ollama is running and the index is built. Citations appear as [book:page-page]. Disease/Drug/Procedure templates follow exam-first, compressed, retrieval-ready rules.
-      </div>
+          <div className="footer">
+            Ensure Ollama is running and the index is built. Citations appear as [book:page-page]. Disease/Drug/Procedure templates follow exam-first, compressed, retrieval-ready rules.
+          </div>
 
-      <div className="card system" style={{ marginTop: 16 }}>
+          <div className="card system" style={{ marginTop: 16 }}>
         <div className="system-header">
           <h2>System</h2>
         </div>
@@ -285,15 +418,14 @@ export default function App() {
                   <span>{ollamaInfo ? 'Healthy' : 'Unreachable'}</span>
                 </>)}
               </div>
-              <select value={selectedModel} onChange={(e) => changeModel(e.target.value)} disabled={switchingModel || !models.length}>
-                <option value="">Select a model…</option>
-                {models.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-              <label style={{ marginTop: 10 }}>Admin key (required to change model)</label>
-              <input type="password" value={adminKey} onChange={(e) => { setAdminKey(e.target.value) }} placeholder="Enter admin key" />
-              {adminError && <div className="error" style={{ marginTop: 6 }}>{adminError}</div>}
+              {isAdmin && (
+                <select value={selectedModel} onChange={(e) => changeModel(e.target.value)} disabled={switchingModel || !models.length}>
+                  <option value="">Select a model…</option>
+                  {models.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -304,6 +436,8 @@ export default function App() {
             <div key={t.id} className={`toast ${t.type}`}>{t.text}</div>
           ))}
         </div>
+          </div>
+        </main>
       </div>
     </div>
   )

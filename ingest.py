@@ -38,7 +38,7 @@ def chunk_pages(pages, book_id: str):
             }
 
 
-def build_dense_index(rows):
+def build_dense_index(rows, progress_cb=None):
     LANCE_DIR.mkdir(parents=True, exist_ok=True)
     db = lancedb.connect(str(LANCE_DIR))
     try:
@@ -47,10 +47,18 @@ def build_dense_index(rows):
         tbl = None
 
     model = SentenceTransformer(EMBED_MODEL_NAME)
+    total = len(rows)
+    processed = 0
     batch = []
     for r in tqdm(rows, desc="Embedding + upsert"):
         emb = model.encode(r["text"], normalize_embeddings=True).tolist()
         batch.append({"id": r["id"], "embedding": emb, "text": r["text"], **r["meta"]})
+        processed += 1
+        if progress_cb and processed % 20 == 0 and total:
+            try:
+                progress_cb(min(1.0, processed / float(total)))
+            except Exception:
+                pass
         if len(batch) >= 128:
             if tbl is None:
                 tbl = db.create_table("chunks", data=batch)
@@ -62,13 +70,26 @@ def build_dense_index(rows):
             tbl = db.create_table("chunks", data=batch)
         else:
             tbl.add(batch)
+    if progress_cb:
+        try:
+            progress_cb(1.0)
+        except Exception:
+            pass
 
 
-def build_bm25(rows):
+def build_bm25(rows, progress_cb=None):
     # Persist raw chunks for transparency
     with open(CHUNK_JSONL, "w") as f:
+        total = len(rows)
+        processed = 0
         for r in rows:
             f.write(json.dumps(r) + "\n")
+            processed += 1
+            if progress_cb and processed % 50 == 0 and total:
+                try:
+                    progress_cb(min(1.0, processed / float(total)))
+                except Exception:
+                    pass
 
     # Tokenize very simply (whitespace + lower)
     corpus, ids = [], []
@@ -79,6 +100,11 @@ def build_bm25(rows):
     bm25 = BM25Okapi(corpus)
     with open(BM25_PATH, "wb") as f:
         pickle.dump({"bm25": bm25, "ids": ids}, f)
+    if progress_cb:
+        try:
+            progress_cb(1.0)
+        except Exception:
+            pass
 
 
 def main():
