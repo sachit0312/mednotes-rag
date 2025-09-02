@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || ''
 const url = (path: string) => `${API_BASE}${path}`
+const NGROK_HEADERS = API_BASE.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } as Record<string,string> : {}
 
 async function call(endpoint: string, payload: Record<string, unknown>) {
   const r = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
     body: JSON.stringify(payload),
   })
   if (!r.ok) {
@@ -67,7 +68,7 @@ export default function App() {
   async function callStream(endpoint: string, payload: Record<string, unknown>, onChunk: (s: string) => void) {
     const r = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...NGROK_HEADERS },
       body: JSON.stringify(payload),
     })
     if (!r.ok || !r.body) {
@@ -122,7 +123,7 @@ export default function App() {
   const checkApi = async () => {
     try {
       setCheckingApi(true)
-      const r = await fetch(url('/api/health'))
+      const r = await fetch(url('/api/health'), { headers: NGROK_HEADERS })
       setApiOk(r.ok)
       setApiError(r.ok ? '' : 'API unreachable')
     } catch {
@@ -136,12 +137,12 @@ export default function App() {
   const checkOllama = async () => {
     try {
       setCheckingOllama(true)
-      const r = await fetch(url('/api/ollama/health'))
+      const r = await fetch(url('/api/ollama/health'), { headers: NGROK_HEADERS })
       if (!r.ok) throw new Error()
       const d = await r.json()
       setOllamaInfo(d)
       if (!selectedModel) setSelectedModel(d.current_model || '')
-      const rr = await fetch(url('/api/ollama/models'))
+      const rr = await fetch(url('/api/ollama/models'), { headers: NGROK_HEADERS })
       if (rr.ok) {
         const mm = await rr.json()
         setModels(mm.models || [])
