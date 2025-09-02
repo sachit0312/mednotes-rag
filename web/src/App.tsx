@@ -278,7 +278,6 @@ export default function App() {
                   <span>{apiOk === null ? '—' : (apiOk ? 'Healthy' : 'Unreachable')}</span>
                 </>)}
               </div>
-              {!apiOk && apiError && <div className="error">{apiError}</div>}
             </div>
           </div>
           <div className="sys-card">
@@ -290,7 +289,6 @@ export default function App() {
                   <span>{ollamaInfo ? 'Healthy' : 'Unreachable'}</span>
                 </>)}
               </div>
-              {!ollamaInfo && ollamaError && <div className="error">{ollamaError}</div>}
               <select value={selectedModel} onChange={(e) => changeModel(e.target.value)} disabled={switchingModel || !models.length}>
                 <option value="">Select a model…</option>
                 {models.map(m => (
