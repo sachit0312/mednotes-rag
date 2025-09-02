@@ -37,7 +37,7 @@
 - Configuration rule: never hardcode endpoints/keys in code. Put runtime knobs in `config.py` and deploy/runtime hosts in `deploy.env` (e.g., `NGROK_DOMAIN`, optional `API_BASE_URL`). UI/server should read from env; Python knobs live in `config.py`.
 
 ## Deploy (Vercel + ngrok)
-- Configure once in `deploy.env` (e.g., `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app`).
+- Configure once in `deploy.env` (e.g., `NGROK_DOMAIN=...`, `VERCEL_PROJECT=mednotes_rag`, optional `VERCEL_SCOPE`).
 - Production: `./scripts/deploy_vercel_ui.sh production`.
 - Preview: `./scripts/deploy_vercel_ui.sh preview`.
 - Override API: `API_BASE_URL=https://api.example.com ./scripts/deploy_vercel_ui.sh production`.

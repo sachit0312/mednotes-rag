@@ -87,12 +87,14 @@ pushd web >/dev/null
   # Deploy
   if [ "$ENVIRONMENT" = "production" ]; then
     if [ -n "$VERCEL_PROJECT" ]; then
+      echo "Deploying to Vercel project: $VERCEL_PROJECT (production)"
       $VERCEL_BIN deploy --prod --yes --name "$VERCEL_PROJECT" $SCOPE_FLAG
     else
       $VERCEL_BIN deploy --prod --yes $SCOPE_FLAG
     fi
   else
     if [ -n "$VERCEL_PROJECT" ]; then
+      echo "Deploying to Vercel project: $VERCEL_PROJECT (preview)"
       $VERCEL_BIN deploy --yes --name "$VERCEL_PROJECT" $SCOPE_FLAG
     else
       $VERCEL_BIN deploy --yes $SCOPE_FLAG
