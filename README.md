@@ -121,7 +121,8 @@ Keep API + Ollama on your laptop (ngrok or tunnel), or host API remotely; deploy
 - Option B (ephemeral): `ngrok http 8000` → copy the HTTPS forwarding URL from http://127.0.0.1:4040
 
 3) Deploy UI to Vercel:
-- One-liner (reserved domain): `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app ./scripts/deploy_vercel_ui.sh production`
+- Configure once in `deploy.env` (e.g., `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app`).
+- One-liner (reserved domain): `./scripts/deploy_vercel_ui.sh production`
 - One-liner (explicit URL): `API_BASE_URL=https://<your-api-host> ./scripts/deploy_vercel_ui.sh production`
 - The UI reads `${VITE_API_BASE_URL}` at build time and calls `${VITE_API_BASE_URL}/api/*`.
 

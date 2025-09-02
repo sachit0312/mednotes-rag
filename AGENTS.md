@@ -36,6 +36,7 @@
 - Changing `EMBED_MODEL_NAME` requires re‑ingest; reranker/LLM swaps do not. `OLLAMA_MODEL` can be overridden via env.
 
 ## Deploy (Vercel + ngrok)
-- For static ngrok: `NGROK_DOMAIN=<your-domain> ./scripts/deploy_vercel_ui.sh production`.
-- For custom API host: `API_BASE_URL=https://api.example.com ./scripts/deploy_vercel_ui.sh production`.
-- Preview builds: pass `preview` instead of `production`.
+- Configure once in `deploy.env` (e.g., `NGROK_DOMAIN=flea-whole-loosely.ngrok-free.app`).
+- Production: `./scripts/deploy_vercel_ui.sh production`.
+- Preview: `./scripts/deploy_vercel_ui.sh preview`.
+- Override API: `API_BASE_URL=https://api.example.com ./scripts/deploy_vercel_ui.sh production`.

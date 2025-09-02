@@ -14,6 +14,12 @@
 
 set -euo pipefail
 
+# Load repo deploy defaults if present
+if [ -f "$(dirname "$0")/../deploy.env" ]; then
+  # shellcheck disable=SC1091
+  . "$(dirname "$0")/../deploy.env"
+fi
+
 ENVIRONMENT="${1:-production}"
 API_BASE_URL="${API_BASE_URL:-}"
 NGROK_DOMAIN="${NGROK_DOMAIN:-}"
@@ -65,6 +71,8 @@ pushd web >/dev/null
   vercel link --yes >/dev/null 2>&1 || true
 
   # Set env var in Vercel for the target environment (adds a new value if one exists)
+  # Best-effort: remove existing value to avoid interactive overwrite prompt
+  vercel env rm VITE_API_BASE_URL "$ENVIRONMENT" --yes >/dev/null 2>&1 || true
   printf "%s" "$API_URL" | vercel env add VITE_API_BASE_URL "$ENVIRONMENT"
 
   # Deploy
@@ -76,4 +84,3 @@ pushd web >/dev/null
 popd >/dev/null
 
 echo "Done. Deployed UI configured to call: $API_URL"
-
