@@ -1,4 +1,9 @@
 from pathlib import Path
+import os
+import subprocess
+import threading
+import time
+import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -6,9 +11,12 @@ from fastapi.staticfiles import StaticFiles
 
 import lancedb
 from query import answer_qa, answer_note, answer_qa_stream, answer_note_stream
-from config import LANCE_DIR
+from config import LANCE_DIR, OLLAMA_MODEL
 
 app = FastAPI(title="MedNotes RAG API", version="0.1.0")
+
+# Provide a reasonable default admin key for local/dev unless overridden by env
+os.environ.setdefault("ADMIN_KEY", "sachit loves astha")
 
 # CORS for local dev / simple UI
 app.add_middleware(
@@ -126,7 +134,83 @@ def api_note(payload: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Mount static UI at the end so API routes take precedence
+# Ollama utilities and admin endpoints
+@app.get("/api/ollama/health")
+def ollama_health():
+    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    try:
+        r = requests.get(f"{base}/api/version", timeout=5)
+        r.raise_for_status()
+        ver = r.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Ollama unreachable: {e}")
+    current_model = os.getenv("OLLAMA_MODEL", OLLAMA_MODEL)
+    return {"base": base, "version": ver, "current_model": current_model}
+
+
+@app.get("/api/ollama/models")
+def ollama_models():
+    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    try:
+        r = requests.get(f"{base}/api/tags", timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        models = [m.get("name") for m in data.get("models", []) if m.get("name")]
+        return {"models": models}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to list models: {e}")
+
+
+@app.post("/api/ollama/set_model")
+def set_ollama_model(request: Request, payload: dict):
+    require_admin(request)
+    model = (payload or {}).get("model")
+    if not model or not isinstance(model, str):
+        raise HTTPException(status_code=400, detail="Missing 'model' string")
+    os.environ["OLLAMA_MODEL"] = model
+    return {"status": "ok", "model": model}
+
+
+def _background_restart_api():
+    try:
+        subprocess.Popen(["bash", "scripts/restart_backend.sh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+@app.post("/api/admin/restart_api")
+def admin_restart_api(request: Request):
+    require_admin(request)
+    threading.Thread(target=_background_restart_api, daemon=True).start()
+    return {"status": "restarting"}
+
+
+def _background_restart_ollama():
+    try:
+        # Try to kill existing ollama serve and start a new one
+        subprocess.Popen(["pkill", "-f", "ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1)
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
+def require_admin(request: Request):
+    expected = os.getenv("ADMIN_KEY")
+    provided = request.headers.get("x-admin-key") or request.headers.get("X-Admin-Key")
+    if not expected:
+        raise HTTPException(status_code=503, detail="ADMIN_KEY not configured on server")
+    if provided != expected:
+        raise HTTPException(status_code=403, detail="Forbidden: invalid admin key")
+
+
+@app.post("/api/admin/restart_ollama")
+def admin_restart_ollama(request: Request):
+    require_admin(request)
+    threading.Thread(target=_background_restart_ollama, daemon=True).start()
+    return {"status": "restarting"}
+
+# Mount static UI after ALL API routes to avoid intercepting /api/*
 try:
     app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="ui")
 except RuntimeError:

@@ -14,6 +14,7 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - ADMIN_KEY=sachit loves astha
     depends_on:
       - ollama
     ports:
@@ -36,4 +37,3 @@ services:
 
 volumes:
   ollama:
-

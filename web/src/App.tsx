@@ -26,6 +26,45 @@ export default function App() {
   const [out, setOut] = useState('')
   const [loading, setLoading] = useState(false)
   const [contexts, setContexts] = useState<any[] | null>(null)
+  const [apiOk, setApiOk] = useState<boolean | null>(null)
+  const [ollamaInfo, setOllamaInfo] = useState<{ base: string; version: any; current_model: string } | null>(null)
+  const [models, setModels] = useState<string[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>('')
+  const [pending, setPending] = useState<string>('')
+  const [adminKey, setAdminKey] = useState<string>('')
+  const [checkingApi, setCheckingApi] = useState(false)
+  const [checkingOllama, setCheckingOllama] = useState(false)
+  const [restartingApi, setRestartingApi] = useState(false)
+  const [restartingOllama, setRestartingOllama] = useState(false)
+  const [switchingModel, setSwitchingModel] = useState(false)
+  const [adminError, setAdminError] = useState<string>('')
+  const [toasts, setToasts] = useState<{ id: number; text: string; type: 'success'|'error'|'info' }[]>([])
+  const [apiError, setApiError] = useState<string>('')
+  const [ollamaError, setOllamaError] = useState<string>('')
+  const [modelError, setModelError] = useState<string>('')
+
+  function pushToast(text: string, type: 'success'|'error'|'info' = 'info', ttl = 2500) {
+    const id = Date.now() + Math.floor(Math.random() * 1000)
+    setToasts(prev => [...prev, { id, text, type }])
+    window.setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, ttl)
+  }
+  const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || ''
+
+  React.useEffect(() => {
+    const k = localStorage.getItem('adminKey') || 'sachit loves astha'
+    setAdminKey(k)
+    if (!localStorage.getItem('adminKey')) localStorage.setItem('adminKey', k)
+    // initial checks
+    checkApi()
+    checkOllama()
+    const id = setInterval(() => {
+      checkApi()
+      checkOllama()
+    }, 30000)
+    return () => clearInterval(id)
+  }, [])
 
   async function callStream(endpoint: string, payload: Record<string, unknown>, onChunk: (s: string) => void) {
     const r = await fetch(endpoint, {
@@ -78,6 +117,116 @@ export default function App() {
       setOut(String(e))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // System helpers
+  const checkApi = async () => {
+    try {
+      setCheckingApi(true)
+      const r = await fetch(url('/api/health'))
+      setApiOk(r.ok)
+      setApiError(r.ok ? '' : 'API unreachable')
+    } catch {
+      setApiOk(false)
+      setApiError('API unreachable')
+    } finally {
+      setCheckingApi(false)
+    }
+  }
+
+  const checkOllama = async () => {
+    try {
+      setCheckingOllama(true)
+      const r = await fetch(url('/api/ollama/health'))
+      if (!r.ok) throw new Error()
+      const d = await r.json()
+      setOllamaInfo(d)
+      if (!selectedModel) setSelectedModel(d.current_model || '')
+      const rr = await fetch(url('/api/ollama/models'))
+      if (rr.ok) {
+        const mm = await rr.json()
+        setModels(mm.models || [])
+        setModelError('')
+      }
+      setOllamaError('')
+    } catch {
+      setOllamaInfo(null)
+      setModels([])
+      setOllamaError('Ollama unreachable')
+      setModelError('')
+    } finally {
+      setCheckingOllama(false)
+    }
+  }
+
+  const restartApi = async () => {
+    try {
+      setRestartingApi(true)
+      setPending('Restarting API...')
+      const headers: any = { }
+      if (adminKey) headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/admin/restart_api'), { method: 'POST', headers })
+      if (!r.ok) {
+        const t = await r.text()
+        setAdminError(r.status === 403 ? 'Invalid admin key' : `Admin error: ${r.status}`)
+        throw new Error(t)
+      }
+      setAdminError('')
+      pushToast('API restart triggered', 'success')
+    } catch (e) {
+      pushToast('Failed to restart API', 'error')
+    } finally {
+      setTimeout(() => checkApi(), 1500)
+      setPending('')
+      setRestartingApi(false)
+    }
+  }
+
+  const restartOllama = async () => {
+    try {
+      setRestartingOllama(true)
+      setPending('Restarting Ollama...')
+      const headers: any = { }
+      if (adminKey) headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/admin/restart_ollama'), { method: 'POST', headers })
+      if (!r.ok) {
+        const t = await r.text()
+        setAdminError(r.status === 403 ? 'Invalid admin key' : `Admin error: ${r.status}`)
+        throw new Error(t)
+      }
+      setAdminError('')
+      pushToast('Ollama restart triggered', 'success')
+    } catch (e) {
+      pushToast('Failed to restart Ollama', 'error')
+    } finally {
+      setTimeout(() => checkOllama(), 1500)
+      setPending('')
+      setRestartingOllama(false)
+    }
+  }
+
+  const changeModel = async (m: string) => {
+    try {
+      setSwitchingModel(true)
+      setPending('Switching model...')
+      const headers: any = { 'Content-Type': 'application/json' }
+      if (adminKey) headers['X-Admin-Key'] = adminKey
+      const r = await fetch(url('/api/ollama/set_model'), { method: 'POST', headers, body: JSON.stringify({ model: m }) })
+      if (!r.ok) {
+        const t = await r.text()
+        setAdminError(r.status === 403 ? 'Invalid admin key' : `Admin error: ${r.status}`)
+        throw new Error(t)
+      }
+      setAdminError('')
+      setSelectedModel(m)
+      await checkOllama()
+      pushToast(`Model set to ${m}`, 'success')
+    } catch (e) {
+      pushToast('Failed to set model', 'error')
+    } finally {
+      setPending('')
+      setSwitchingModel(false)
     }
   }
 
@@ -160,6 +309,69 @@ export default function App() {
 
       <div className="footer">
         Ensure Ollama is running and the index is built. Citations appear as [book:page-page]. Disease/Drug/Procedure templates follow exam-first, compressed, retrieval-ready rules.
+      </div>
+
+      <div className="card system" style={{ marginTop: 16 }}>
+        <div className="system-header">
+          <h2>System</h2>
+        </div>
+        <div className="system-grid">
+          <div className="sys-card">
+            <div className="sys-title">API</div>
+            <div className="sys-body">
+              <div className="stat">
+                {checkingApi ? (<><span className="spinner"/> Checking…</>) : (<>
+                  <span className={`dot ${apiOk ? 'ok' : 'down'}`}></span>
+                  <span>{apiOk === null ? '—' : (apiOk ? 'Healthy' : 'Unreachable')}</span>
+                </>)}
+              </div>
+              {!apiOk && apiError && <div className="error">{apiError}</div>}
+              <div className="sys-actions">
+                <button onClick={checkApi} disabled={checkingApi}>{checkingApi ? (<><span className="spinner" /> Checking…</>) : 'Check'}</button>
+                <button onClick={restartApi} className="secondary" disabled={restartingApi}>{restartingApi ? (<><span className="spinner" /> Restarting…</>) : 'Restart'}</button>
+              </div>
+            </div>
+          </div>
+          <div className="sys-card">
+            <div className="sys-title">Ollama</div>
+            <div className="sys-body">
+              <div className="stat">
+                {checkingOllama ? (<><span className="spinner"/> Checking…</>) : (<>
+                  <span className={`dot ${ollamaInfo ? 'ok' : 'down'}`}></span>
+                  <span>{ollamaInfo ? (ollamaInfo.current_model || '—') : 'Unreachable'}</span>
+                </>)}
+              </div>
+              {!ollamaInfo && ollamaError && <div className="error">{ollamaError}</div>}
+              <div className="sys-actions">
+                <button onClick={checkOllama} disabled={checkingOllama}>{checkingOllama ? (<><span className="spinner" /> Checking…</>) : 'Check'}</button>
+                <button onClick={restartOllama} className="secondary" disabled={restartingOllama}>{restartingOllama ? (<><span className="spinner" /> Restarting…</>) : 'Restart'}</button>
+              </div>
+            </div>
+          </div>
+          <div className="sys-card">
+            <div className="sys-title">Model</div>
+            <div className="sys-body">
+              <select value={selectedModel} onChange={(e) => changeModel(e.target.value)} disabled={switchingModel || !models.length}>
+                <option value="">Select a model…</option>
+                {models.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <label style={{ marginTop: 10 }}>Admin key</label>
+              <input type="password" value={adminKey} onChange={(e) => { setAdminKey(e.target.value); localStorage.setItem('adminKey', e.target.value) }} placeholder="Enter admin key" />
+              {adminError && <div className="error" style={{ marginTop: 6 }}>{adminError}</div>}
+              {!models.length && !checkingOllama && <div className="muted" style={{ marginTop: 6 }}>No models available</div>}
+              {modelError && <div className="error" style={{ marginTop: 6 }}>{modelError}</div>}
+            </div>
+          </div>
+        </div>
+        {pending && <div className="muted" style={{ marginTop: 10 }}>{pending}</div>}
+        {/* Toasts */}
+        <div className="toast-wrap">
+          {toasts.map(t => (
+            <div key={t.id} className={`toast ${t.type}`}>{t.text}</div>
+          ))}
+        </div>
       </div>
     </div>
   )

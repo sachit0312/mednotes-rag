@@ -15,3 +15,31 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .answer { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background: #0a1020; border: 1px solid #223252; border-radius: 10px; padding: 14px; min-height: 160px; overflow-wrap: anywhere; }
 .muted { color: var(--muted); font-size: 12px; }
 .footer { margin-top: 18px; color: var(--muted); font-size: 12px; }
+.status { display: inline-flex; align-items: center; gap: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ok { background: #22c55e; }
+.down { background: #ef4444; }
+.error { color: #ef4444; font-size: 12px; }
+
+/* System panel enhancements */
+.system-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.system-header h2 { margin: 0; font-size: 18px; }
+.system-badges { display: flex; gap: 8px; }
+.badge { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid #2a3b62; background: #0a1326; color: var(--fg); }
+.badge.ok { border-color: #1e7041; background: #0c1b12; }
+.badge.down { border-color: #7a2222; background: #1a0e0e; }
+.system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+.sys-card { background: #0d1528; border: 1px solid #213356; border-radius: 10px; padding: 12px; }
+.sys-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.sys-body { display: flex; flex-direction: column; gap: 8px; }
+.sys-actions { display: flex; gap: 8px; }
+button.secondary { background: transparent; color: var(--fg); border: 1px solid #2b3f6a; }
+.stat { display: flex; align-items: center; gap: 8px; }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2b3f6a; border-top-color: var(--accent); display: inline-block; vertical-align: -2px; animation: spin .8s linear infinite; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toasts */
+.toast-wrap { position: fixed; right: 16px; top: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+.toast { background: #0d1528; border: 1px solid #223252; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--fg); box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.toast.success { border-color: #1e7041; }
+.toast.error { border-color: #7a2222; }
